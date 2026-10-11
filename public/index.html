@@ -187,6 +187,8 @@
   let mine = loadMine();          // { id, token } saved on this device
   let prefilled = false;
   let busy = false;
+  let lastSavedAt = 0;   // when this device last saved a response
+  let localMine = null;  // this device's response, shown right away after saving
 
   function loadMine() {
     try { return JSON.parse(localStorage.getItem(MINE_KEY)) || null; } catch (e) { return null; }
@@ -380,9 +382,11 @@
       const data = await res.json();
       responses = data.responses || [];
 
-      // Forget this device's response if the organizer removed it.
+      // Storage can lag right after a save, so keep this device's new response for a while.
+      const recent = Date.now() - lastSavedAt < 30000;
       if (mine && mine.id && !responses.some((r) => r.id === mine.id)) {
-        saveMine(null);
+        if (recent && localMine) responses.push(localMine);
+        else saveMine(null); // the organizer removed it
       }
       const own = mine && responses.find((r) => r.id === mine.id);
       if (own && !prefilled) {
@@ -434,8 +438,13 @@
       }
       saveMine({ id: r.data.id, token });
       prefilled = true;
+      lastSavedAt = Date.now();
+      localMine = { id: r.data.id, name: payload.name, days: payload.days, times: payload.times, locs: payload.locs };
+      responses = responses.filter((x) => x.id !== localMine.id).concat([localMine]);
+      renderResults();
       setStatus("Saved. Your response is included in the results.");
-      await load();
+      setTimeout(load, 2000);
+      setTimeout(load, 6000);
     } catch (e) {
       setStatus("Could not save your response. Check your connection and try again.", true);
     } finally {
@@ -454,6 +463,8 @@
       });
       if (res.ok || res.status === 404) {
         saveMine(null);
+        localMine = null;
+        lastSavedAt = 0;
         sel.days.clear(); sel.times.clear(); sel.locs.clear();
         document.querySelectorAll("[data-id]").forEach((b) => b.setAttribute("aria-pressed", "false"));
         nameEl.value = "";
@@ -473,7 +484,7 @@
   renderPickers();
   refreshButtons();
   load();
-  setInterval(load, 20000);
+  setInterval(load, 5000);
 })();
 </script>
 </body>

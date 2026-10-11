@@ -1,7 +1,7 @@
 import { getStore } from "@netlify/blobs";
 
 // Allowed values. Anything else sent by a browser is ignored.
-const DAYS = ["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16"];
+const DAYS = ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"];
 const TIMES = ["morning", "afternoon", "evening"];
 const LOCS = ["makati", "eastwood"];
 

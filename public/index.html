@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riftbound ARAM Availability</title>
+<style>
+  :root {
+    --bg: #f5f4f0; --surface: #ffffff; --ink: #1c1c1e; --muted: #66666c;
+    --line: #dedcd5; --accent: #2c55c8; --accent-ink: #ffffff; --accent-soft: #e6ecfb;
+    --good: #1d7a45; --warn: #8a5a00; --bad: #a33a2b;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131316; --surface: #1c1c21; --ink: #f1f1f4; --muted: #9b9ba4;
+      --line: #2d2d35; --accent: #7d9dff; --accent-ink: #10131f; --accent-soft: #222a44;
+      --good: #52c47f; --warn: #e0b35a; --bad: #ef8a7b; color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 24px 16px 48px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; min-width: 0; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; text-wrap: balance; }
+  h2 { font-size: 1.02rem; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px; margin-bottom: 16px; min-width: 0;
+  }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip, .loc, .primary, .danger, .ghost {
+    font: inherit; cursor: pointer; color: var(--ink);
+  }
+  .chip {
+    border: 1px solid var(--line); background: var(--surface);
+    padding: 8px 14px; border-radius: 999px;
+  }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .grid-2 { grid-template-columns: 1fr; } }
+  .loc {
+    border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+    background: var(--surface); text-align: left;
+  }
+  .loc[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .loc strong { display: block; }
+  .loc span { color: var(--muted); font-size: .9rem; }
+  .slot-label { color: var(--muted); font-size: .85rem; margin: 14px 0 8px; }
+  .slot-label:first-child { margin-top: 0; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  .spread { justify-content: space-between; }
+  input[type="text"] {
+    flex: 1 1 180px; min-width: 0; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit;
+  }
+  .primary {
+    background: var(--accent); color: var(--accent-ink); border: 0;
+    padding: 10px 18px; border-radius: 8px;
+  }
+  .primary:disabled { opacity: .45; cursor: not-allowed; }
+  .danger, .ghost {
+    background: none; border: 1px solid var(--line); color: var(--muted);
+    padding: 8px 12px; border-radius: 8px; font-size: .9rem;
+  }
+  .hint { color: var(--muted); font-size: .9rem; margin: 8px 0 0; }
+  .msg { font-size: .95rem; margin: 10px 0 0; min-height: 1.2em; }
+  .msg.err { color: var(--bad); }
+  .best { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (max-width: 560px) { .best { grid-template-columns: 1fr; } }
+  .box { border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+  .label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+  .value { font-size: 1.15rem; font-weight: 700; color: var(--good); margin-top: 4px; overflow-wrap: anywhere; }
+  .value.empty { color: var(--muted); font-weight: 600; }
+  .detail { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; min-width: 520px; }
+  th, td { text-align: center; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  th.day, td.day { text-align: left; white-space: nowrap; }
+  td.num { font-variant-numeric: tabular-nums; }
+  td.lead { color: var(--good); font-weight: 700; }
+  ul.who { list-style: none; padding: 0; margin: 0; }
+  ul.who li { padding: 10px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+  ul.who li:last-child { border-bottom: 0; }
+  .tag { color: var(--accent); font-size: .8rem; margin-left: 6px; }
+  .meta { color: var(--muted); font-size: .9rem; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Riftbound ARAM Availability</h1>
+  <p class="sub">Pick the days, times, and locations that work for you. Results update for everyone. Oct 12 to 16.</p>
+
+  <div class="card">
+    <h2>1. Your name</h2>
+    <input type="text" id="name" placeholder="e.g. Lance" maxlength="40" aria-label="Your name">
+    <p class="hint">Shown next to your response. Optional.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Days that work</h2>
+    <div class="opts" id="days"></div>
+  </div>
+
+  <div class="card">
+    <h2>3. Times that work</h2>
+    <div class="opts" id="times"></div>
+  </div>
+
+  <div class="card">
+    <h2>4. Locations that work</h2>
+    <div class="grid-2" id="locs"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button class="primary" id="submit" disabled>Submit my availability</button>
+      <button class="danger" id="remove" hidden>Remove my response</button>
+    </div>
+    <p class="msg" id="status" role="status"></p>
+  </div>
+
+  <div class="card">
+    <h2>Best picks</h2>
+    <div class="best" id="best"></div>
+  </div>
+
+  <div class="card">
+    <h2>Count by day, location, and time</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="day" rowspan="2">Day</th>
+            <th colspan="3">Anime Point, Makati</th>
+            <th colspan="3">Popculture Community, Eastwood</th>
+          </tr>
+          <tr id="sub-head"></tr>
+        </thead>
+        <tbody id="grid"></tbody>
+      </table>
+    </div>
+    <p class="hint">Numbers show how many people can make that day, place, and time. Highlighted cells have the most.</p>
+  </div>
+
+  <div class="card">
+    <h2>Responses</h2>
+    <ul class="who" id="who"></ul>
+  </div>
+</div>
+
+<script>
+(function () {
+  const DAYS = [
+    { id: "2026-10-12", label: "Mon, Oct 12" },
+    { id: "2026-10-13", label: "Tue, Oct 13" },
+    { id: "2026-10-14", label: "Wed, Oct 14" },
+    { id: "2026-10-15", label: "Thu, Oct 15" },
+    { id: "2026-10-16", label: "Fri, Oct 16" }
+  ];
+  const TIMES = [
+    { id: "morning", label: "Morning", range: "around 11 AM" },
+    { id: "afternoon", label: "Afternoon", range: "around 2 PM" },
+    { id: "evening", label: "Evening", range: "around 6 PM" }
+  ];
+  const LOCS = [
+    { id: "makati", label: "Anime Point", area: "Makati" },
+    { id: "eastwood", label: "Popculture Community", area: "Eastwood" }
+  ];
+  const MINE_KEY = "riftbound-aram-mine";
+  const API = "/api/responses";
+
+  const $ = (s) => document.querySelector(s);
+  const nameEl = $("#name");
+  const submitBtn = $("#submit");
+  const removeBtn = $("#remove");
+  const statusEl = $("#status");
+
+  const sel = { days: new Set(), times: new Set(), locs: new Set() };
+  let responses = [];
+  let mine = loadMine();          // { id, token } saved on this device
+  let prefilled = false;
+  let busy = false;
+
+  function loadMine() {
+    try { return JSON.parse(localStorage.getItem(MINE_KEY)) || null; } catch (e) { return null; }
+  }
+  function saveMine(v) {
+    mine = v;
+    try {
+      if (v) localStorage.setItem(MINE_KEY, JSON.stringify(v));
+      else localStorage.removeItem(MINE_KEY);
+    } catch (e) { /* private mode: keep working in memory */ }
+  }
+  function newToken() {
+    const a = new Uint8Array(24);
+    crypto.getRandomValues(a);
+    return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  function setStatus(msg, isErr) {
+    statusEl.textContent = msg || "";
+    statusEl.classList.toggle("err", !!isErr);
+  }
+  function refreshButtons() {
+    const complete = sel.days.size && sel.times.size && sel.locs.size;
+    submitBtn.disabled = busy || !complete;
+    removeBtn.hidden = !mine || !mine.id;
+  }
+
+  function renderPickers() {
+    const fill = (host, items, key, cls) => {
+      items.forEach((it) => {
+        const b = document.createElement("button");
+        b.className = cls;
+        b.dataset.id = it.id;
+        b.setAttribute("aria-pressed", "false");
+        if (cls === "loc") {
+          const strong = document.createElement("strong"); strong.textContent = it.label;
+          const span = document.createElement("span"); span.textContent = it.area;
+          b.append(strong, span);
+        } else {
+          b.textContent = it.range ? it.label + " (" + it.range + ")" : it.label;
+        }
+        b.onclick = () => {
+          if (sel[key].has(it.id)) sel[key].delete(it.id); else sel[key].add(it.id);
+          b.setAttribute("aria-pressed", String(sel[key].has(it.id)));
+          refreshButtons();
+        };
+        host.appendChild(b);
+      });
+    };
+    fill($("#days"), DAYS, "days", "chip");
+    fill($("#times"), TIMES, "times", "chip");
+    fill($("#locs"), LOCS, "locs", "loc");
+
+    const sub = $("#sub-head");
+    LOCS.forEach(() => TIMES.forEach((t) => {
+      const th = document.createElement("th"); th.textContent = t.label; sub.appendChild(th);
+    }));
+  }
+
+  function syncPickers(r) {
+    const mark = (host, key, values) => {
+      host.querySelectorAll("[data-id]").forEach((b) => {
+        const on = values.includes(b.dataset.id);
+        b.setAttribute("aria-pressed", String(on));
+      });
+      sel[key] = new Set(values);
+    };
+    mark($("#days"), "days", r.days);
+    mark($("#times"), "times", r.times);
+    mark($("#locs"), "locs", r.locs);
+    refreshButtons();
+  }
+
+  // Count people per combination. A person counts once for every combination they picked.
+  function tally() {
+    const day = {}, time = {}, loc = {}, combo = {};
+    DAYS.forEach((d) => { day[d.id] = 0; });
+    TIMES.forEach((t) => { time[t.id] = 0; });
+    LOCS.forEach((l) => { loc[l.id] = 0; });
+    DAYS.forEach((d) => LOCS.forEach((l) => TIMES.forEach((t) => { combo[d.id + "|" + l.id + "|" + t.id] = 0; })));
+    responses.forEach((r) => {
+      r.days.forEach((d) => { if (d in day) day[d]++; });
+      r.times.forEach((t) => { if (t in time) time[t]++; });
+      r.locs.forEach((l) => { if (l in loc) loc[l]++; });
+      r.days.forEach((d) => r.locs.forEach((l) => r.times.forEach((t) => {
+        const k = d + "|" + l + "|" + t;
+        if (k in combo) combo[k]++;
+      })));
+    });
+    return { day, time, loc, combo };
+  }
+
+  // Return the top label(s) and count, or null when nobody has picked anything yet.
+  function leaders(entries) {
+    const max = Math.max(0, ...entries.map((e) => e.c));
+    if (!max) return null;
+    const tops = entries.filter((e) => e.c === max);
+    return { label: tops.map((t) => t.label).join(" / "), c: max, ties: tops.length > 1 };
+  }
+
+  function pickBox(label, lead, detail) {
+    const el = document.createElement("div");
+    el.className = "box";
+    const a = document.createElement("div"); a.className = "label"; a.textContent = label;
+    const b = document.createElement("div");
+    b.className = "value" + (lead ? "" : " empty");
+    b.textContent = lead ? lead.label : "None yet";
+    const c = document.createElement("div"); c.className = "detail";
+    c.textContent = lead ? detail(lead) : "Waiting for responses";
+    el.append(a, b, c);
+    return el;
+  }
+
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
+
+  function renderResults() {
+    const t = tally();
+    const n = responses.length;
+
+    const bestDay = leaders(DAYS.map((d) => ({ label: d.label, c: t.day[d.id] })));
+    const bestTime = leaders(TIMES.map((x) => ({ label: x.label, c: t.time[x.id] })));
+    const bestLoc = leaders(LOCS.map((l) => ({ label: l.label + ", " + l.area, c: t.loc[l.id] })));
+
+    const comboEntries = [];
+    DAYS.forEach((d) => LOCS.forEach((l) => TIMES.forEach((x) => {
+      comboEntries.push({
+        label: d.label + ", " + x.label + " at " + l.label,
+        c: t.combo[d.id + "|" + l.id + "|" + x.id]
+      });
+    })));
+    const bestCombo = leaders(comboEntries);
+
+    const best = $("#best");
+    best.innerHTML = "";
+    best.append(
+      pickBox("Best day", bestDay, (x) => plural(x.c, "person", "people") + " can make it" + (x.ties ? " (tied)" : "")),
+      pickBox("Best time", bestTime, (x) => plural(x.c, "person", "people") + " can make it" + (x.ties ? " (tied)" : "")),
+      pickBox("Best location", bestLoc, (x) => plural(x.c, "person", "people") + " can make it" + (x.ties ? " (tied)" : "")),
+      pickBox("Best day, time and location", bestCombo, (x) => plural(x.c, "person", "people") + " available" + (x.ties ? " (tied)" : ""))
+    );
+
+    const topCombo = bestCombo ? bestCombo.c : 0;
+    const grid = $("#grid");
+    grid.innerHTML = "";
+    DAYS.forEach((d) => {
+      const tr = document.createElement("tr");
+      const first = document.createElement("td");
+      first.className = "day";
+      first.textContent = d.label;
+      tr.appendChild(first);
+      LOCS.forEach((l) => TIMES.forEach((x) => {
+        const td = document.createElement("td");
+        const v = t.combo[d.id + "|" + l.id + "|" + x.id];
+        td.className = "num" + (topCombo && v === topCombo ? " lead" : "");
+        td.textContent = v;
+        tr.appendChild(td);
+      }));
+      grid.appendChild(tr);
+    });
+
+    const who = $("#who");
+    who.innerHTML = "";
+    if (!n) {
+      const li = document.createElement("li");
+      li.className = "meta";
+      li.textContent = "No one has responded yet.";
+      who.appendChild(li);
+    }
+    responses.forEach((r) => {
+      const li = document.createElement("li");
+      const label = (arr, list) => arr.map((id) => (list.find((x) => x.id === id) || { label: id }).label).join(", ");
+      const name = document.createElement("strong");
+      name.textContent = r.name || "Anonymous";
+      li.appendChild(name);
+      if (mine && r.id === mine.id) {
+        const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = "(you)";
+        li.appendChild(tag);
+      }
+      const detail = document.createElement("div");
+      detail.className = "meta";
+      detail.textContent =
+        label(r.days, DAYS) + " | " + label(r.times, TIMES) + " | " + label(r.locs, LOCS);
+      li.appendChild(detail);
+      who.appendChild(li);
+    });
+  }
+
+  async function load() {
+    try {
+      const res = await fetch(API, { cache: "no-store" });
+      if (!res.ok) throw new Error("load");
+      const data = await res.json();
+      responses = data.responses || [];
+
+      // Forget this device's response if the organizer removed it.
+      if (mine && mine.id && !responses.some((r) => r.id === mine.id)) {
+        saveMine(null);
+      }
+      const own = mine && responses.find((r) => r.id === mine.id);
+      if (own && !prefilled) {
+        syncPickers(own);
+        nameEl.value = own.name || "";
+        prefilled = true;
+        setStatus("Your saved response is loaded. Change it and submit to update.");
+      }
+      refreshButtons();
+      renderResults();
+    } catch (e) {
+      setStatus("Could not load responses. Retrying.", true);
+    }
+  }
+
+  async function post(body) {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
+  }
+
+  submitBtn.onclick = async () => {
+    if (busy) return;
+    busy = true; refreshButtons();
+    const token = (mine && mine.token) || newToken();
+    const payload = {
+      token,
+      id: mine && mine.id ? mine.id : undefined,
+      name: nameEl.value.trim().slice(0, 40),
+      days: [...sel.days],
+      times: [...sel.times],
+      locs: [...sel.locs]
+    };
+    try {
+      let r = await post(payload);
+      // The saved response was deleted. Send it again as a new one.
+      if (r.status === 404 && payload.id) {
+        delete payload.id;
+        r = await post(payload);
+      }
+      if (!r.ok) {
+        setStatus(r.status === 403
+          ? "This device can't change that response. Remove it and submit again."
+          : "Could not save your response. Try again in a moment.", true);
+        return;
+      }
+      saveMine({ id: r.data.id, token });
+      prefilled = true;
+      setStatus("Saved. Your response is included in the results.");
+      await load();
+    } catch (e) {
+      setStatus("Could not save your response. Check your connection and try again.", true);
+    } finally {
+      busy = false; refreshButtons();
+    }
+  };
+
+  removeBtn.onclick = async () => {
+    if (busy || !mine || !mine.id) return;
+    busy = true; refreshButtons();
+    try {
+      const res = await fetch(API, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: mine.id, token: mine.token })
+      });
+      if (res.ok || res.status === 404) {
+        saveMine(null);
+        sel.days.clear(); sel.times.clear(); sel.locs.clear();
+        document.querySelectorAll("[data-id]").forEach((b) => b.setAttribute("aria-pressed", "false"));
+        nameEl.value = "";
+        prefilled = false;
+        setStatus("Your response was removed.");
+        await load();
+      } else {
+        setStatus("Could not remove your response. Try again in a moment.", true);
+      }
+    } catch (e) {
+      setStatus("Could not remove your response. Check your connection and try again.", true);
+    } finally {
+      busy = false; refreshButtons();
+    }
+  };
+
+  renderPickers();
+  refreshButtons();
+  load();
+  setInterval(load, 20000);
+})();
+</script>
+</body>
+</html>
